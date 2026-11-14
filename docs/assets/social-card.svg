@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#0d1f14"/><svg x="0" y="34" width="1200" height="562.5" viewBox="0 0 1280 600">
+  
+  
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#11291b"/>
+      <stop offset=".6" stop-color="#0c1d13"/>
+      <stop offset="1" stop-color="#08140d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9be564"/>
+      <stop offset="1" stop-color="#5fcf8a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#9be564" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#9be564" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="96" height="32" patternUnits="userSpaceOnUse">
+      <path d="M96 0H0v32" fill="none" stroke="#9be564" stroke-opacity=".05"/>
+    </pattern>
+    <pattern id="hidden" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="10" height="10" fill="#ffd166" fill-opacity=".07"/>
+      <path d="M0 0v10" stroke="#ffd166" stroke-opacity=".28" stroke-width="3"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+    <style>
+      .ui{font-family:'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif}
+      .mono{font-family:'Cascadia Mono',Consolas,'SF Mono',Menlo,monospace}
+      .cell{font:14px 'Cascadia Mono',Consolas,'SF Mono',Menlo,monospace;fill:#d5e6d8}
+      .head{font:600 13px 'Cascadia Mono',Consolas,Menlo,monospace;fill:#8fa596}
+      .rn{font:12px 'Cascadia Mono',Consolas,Menlo,monospace;fill:#6f8a77}
+    </style>
+  </defs>
+
+  <rect width="1280" height="600" fill="url(#bg)"/>
+  <rect width="1280" height="600" fill="url(#grid)"/>
+  <circle cx="930" cy="250" r="420" fill="url(#glow)"/>
+
+  <!-- Left: brand and promise -->
+  <g transform="translate(70 138)">
+    <rect width="64" height="64" rx="15" fill="#0d1f14" stroke="#9be564" stroke-opacity=".35"/>
+    <rect x="9" y="12" width="46" height="40" rx="6" fill="none" stroke="#9be564" stroke-width="3.4"/>
+    <path d="M9 25h46M9 38h46M25 12v40" stroke="#9be564" stroke-width="2.4" opacity=".6"/>
+    <path d="M33 43l6 6 13-15" fill="none" stroke="#ffd166" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="70" y="252" class="ui" font-size="14" font-weight="700" letter-spacing="4" fill="#9be564">SPREADSHEET CHANGE CONTROL</text>
+  <text x="66" y="326" class="ui" font-size="76" font-weight="800" letter-spacing="-2" fill="#eaf5ec">Sheet Sentry</text>
+  <text x="70" y="378" class="ui" font-size="27" fill="#cfe3d3">Review every formula an AI</text>
+  <text x="70" y="413" class="ui" font-size="27" fill="#cfe3d3">touched in your workbook.</text>
+
+  <g class="ui" font-size="15" font-weight="650">
+    <rect x="70" y="448" width="152" height="34" rx="17" fill="#ff5d5d" fill-opacity=".14" stroke="#ff5d5d" stroke-opacity=".55"/>
+    <text x="146" y="470" text-anchor="middle" fill="#ff9a9a">Hardcoded totals</text>
+    <rect x="232" y="448" width="140" height="34" rx="17" fill="#ff5d5d" fill-opacity=".14" stroke="#ff5d5d" stroke-opacity=".55"/>
+    <text x="302" y="470" text-anchor="middle" fill="#ff9a9a">Shrunken SUMs</text>
+    <rect x="382" y="448" width="132" height="34" rx="17" fill="#ff9f43" fill-opacity=".14" stroke="#ff9f43" stroke-opacity=".55"/>
+    <text x="448" y="470" text-anchor="middle" fill="#ffc48a">Masked errors</text>
+  </g>
+  <text x="70" y="524" class="ui" font-size="16" fill="#8fa596">Runs in your browser · Nothing uploaded · Open source (MIT)</text>
+
+  <!-- Right: spreadsheet window -->
+  <g filter="url(#shadow)">
+    <rect x="620" y="56" width="600" height="404" rx="16" fill="#132a1c" stroke="#d6ffde" stroke-opacity=".16"/>
+  </g>
+  <path d="M636 56h568a16 16 0 0 1 16 16v20H620V72a16 16 0 0 1 16-16z" fill="#0f2217"/>
+  <circle cx="642" cy="74" r="6" fill="#ff5d5d" fill-opacity=".8"/>
+  <circle cx="662" cy="74" r="6" fill="#ffd166" fill-opacity=".8"/>
+  <circle cx="682" cy="74" r="6" fill="#5fcf8a" fill-opacity=".8"/>
+  <text x="920" y="79" text-anchor="middle" class="mono" font-size="13" fill="#9fb8a6">q3-budget-ai-edit.xlsx</text>
+
+  <!-- formula bar -->
+  <rect x="620" y="92" width="600" height="32" fill="#0b1a11"/>
+  <text x="640" y="113" class="ui" font-size="13" font-style="italic" font-weight="700" fill="#8fa596">fx</text>
+  <path d="M664 98v20" stroke="#d6ffde" stroke-opacity=".15"/>
+  <text x="678" y="113" class="mono" font-size="15" fill="#eaf5ec">=SUM(B2:<tspan fill="#ff7b7b" font-weight="700">B5</tspan>)</text>
+  <text x="1204" y="113" text-anchor="end" class="mono" font-size="12" fill="#6f8a77">Costs!B7</text>
+
+  <!-- header row -->
+  <rect x="620" y="124" width="600" height="26" fill="#102518"/>
+  <g class="head" text-anchor="middle">
+    <text x="745" y="142">A</text><text x="895" y="142">B</text><text x="1025" y="142">C</text><text x="1155" y="142">D</text>
+  </g>
+
+  <!-- highlighted rows and cells (drawn under the grid lines) -->
+  <rect x="620" y="246" width="600" height="32" fill="#7cc4ff" fill-opacity=".07"/>
+  <rect x="620" y="246" width="4" height="32" fill="#7cc4ff"/>
+  <rect x="620" y="278" width="600" height="32" fill="url(#hidden)"/>
+  <rect x="830" y="342" width="130" height="32" fill="#ff5d5d" fill-opacity=".2"/>
+  <rect x="831" y="343" width="128" height="30" fill="none" stroke="#ff5d5d" stroke-width="2.5"/>
+  <path d="M948 343h11v11z" fill="#ff5d5d"/>
+  <rect x="830" y="374" width="130" height="32" fill="#ff9f43" fill-opacity=".18"/>
+  <rect x="831" y="375" width="128" height="30" fill="none" stroke="#ff9f43" stroke-width="2.2"/>
+  <path d="M948 375h11v11z" fill="#ff9f43"/>
+
+  <!-- grid lines -->
+  <g stroke="#d6ffde" stroke-opacity=".08">
+    <path d="M620 150h600M620 182h600M620 214h600M620 246h600M620 278h600M620 310h600M620 342h600M620 374h600M620 406h600"/>
+    <path d="M660 124v282M830 124v282M960 124v282M1090 124v282"/>
+  </g>
+  <rect x="620" y="150" width="40" height="256" fill="#102518" fill-opacity=".7"/>
+
+  <!-- row numbers -->
+  <g class="rn" text-anchor="end">
+    <text x="650" y="171">1</text><text x="650" y="203">2</text><text x="650" y="235">3</text><text x="650" y="267">4</text>
+    <text x="650" y="299">5</text><text x="650" y="331">6</text><text x="650" y="363">7</text><text x="650" y="395">8</text>
+  </g>
+
+  <!-- cells -->
+  <g class="cell">
+    <text x="672" y="171" font-weight="700" fill="#9fb8a6">Cost</text>
+    <text x="948" y="171" text-anchor="end" font-weight="700" fill="#9fb8a6">Jul</text>
+    <text x="1078" y="171" text-anchor="end" font-weight="700" fill="#9fb8a6">Aug</text>
+    <text x="1208" y="171" text-anchor="end" font-weight="700" fill="#9fb8a6">Sep</text>
+
+    <text x="672" y="203">Salaries</text>
+    <text x="948" y="203" text-anchor="end">41,000</text><text x="1078" y="203" text-anchor="end">41,000</text><text x="1208" y="203" text-anchor="end">42,500</text>
+    <text x="672" y="235">Cloud</text>
+    <text x="948" y="235" text-anchor="end">6,200</text><text x="1078" y="235" text-anchor="end">6,800</text><text x="1208" y="235" text-anchor="end">7,100</text>
+    <text x="672" y="267">Marketing</text>
+    <text x="948" y="267" text-anchor="end">4,000</text><text x="1078" y="267" text-anchor="end">4,500</text><text x="1208" y="267" text-anchor="end">5,000</text>
+    <text x="672" y="299" fill="#9fb8a6">Office</text>
+    <text x="948" y="299" text-anchor="end" fill="#9fb8a6">3,100</text><text x="1078" y="299" text-anchor="end" fill="#9fb8a6">3,100</text><text x="1208" y="299" text-anchor="end" fill="#9fb8a6">3,100</text>
+    <text x="672" y="331">Tools</text>
+    <text x="948" y="331" text-anchor="end">1,900</text><text x="1078" y="331" text-anchor="end">2,000</text><text x="1208" y="331" text-anchor="end">2,100</text>
+    <text x="672" y="363" font-weight="700">Total</text>
+    <text x="940" y="363" text-anchor="end" font-weight="700" fill="#ffd0d0">54,300</text>
+    <text x="1078" y="363" text-anchor="end" font-weight="700" fill="#c6f0a8">57,400</text>
+    <text x="1208" y="363" text-anchor="end" font-weight="700" fill="#c6f0a8">59,800</text>
+    <text x="672" y="395">Margin</text>
+    <text x="940" y="395" text-anchor="end" fill="#ffe0c2">0.0%</text>
+    <text x="1078" y="395" text-anchor="end" fill="#c6f0a8">18.4%</text>
+    <text x="1208" y="395" text-anchor="end" fill="#c6f0a8">19.1%</text>
+  </g>
+
+  <!-- row tags -->
+  <g class="ui" font-size="10.5" font-weight="700" letter-spacing="1">
+    <rect x="760" y="255" width="60" height="16" rx="8" fill="#7cc4ff" fill-opacity=".18"/>
+    <text x="790" y="267" text-anchor="middle" fill="#a9d8ff">INSERTED</text>
+    <rect x="766" y="287" width="54" height="16" rx="8" fill="#ffd166" fill-opacity=".2"/>
+    <text x="793" y="299" text-anchor="middle" fill="#ffe29a">HIDDEN</text>
+  </g>
+
+  <!-- numbered badges -->
+  <g class="ui" font-size="12" font-weight="800" text-anchor="middle" fill="#0d1f14">
+    <circle cx="830" cy="342" r="10" fill="#ff5d5d"/><text x="830" y="346">1</text>
+    <circle cx="830" cy="374" r="10" fill="#ff9f43"/><text x="830" y="378">2</text>
+    <circle cx="830" cy="278" r="10" fill="#ffd166"/><text x="830" y="282">3</text>
+  </g>
+
+  <!-- sheet tabs -->
+  <g class="ui" font-size="13" font-weight="600">
+    <path d="M620 414h600" stroke="#d6ffde" stroke-opacity=".1"/>
+    <text x="646" y="440" fill="#8fa596">Revenue</text>
+    <circle cx="710" cy="436" r="4" fill="#ff5d5d"/>
+    <rect x="726" y="418" width="78" height="30" rx="8" fill="#193524" stroke="#9be564" stroke-opacity=".4"/>
+    <text x="744" y="438" fill="#eaf5ec">Costs</text>
+    <circle cx="790" cy="434" r="4" fill="#ff5d5d"/>
+    <text x="822" y="440" fill="#8fa596">Summary</text>
+    <circle cx="888" cy="436" r="4" fill="#ff5d5d"/>
+    <text x="910" y="440" fill="#6f8a77">Assumptions</text>
+    <rect x="998" y="428" width="56" height="16" rx="8" fill="#ffffff" fill-opacity=".07"/>
+    <text x="1026" y="440" text-anchor="middle" font-size="10" letter-spacing="1" fill="#8fa596">HIDDEN</text>
+  </g>
+
+  <!-- finding cards -->
+  <g class="ui">
+    <rect x="620" y="480" width="190" height="88" rx="14" fill="#1a1414" stroke="#ff5d5d" stroke-opacity=".6"/>
+    <circle cx="642" cy="503" r="10" fill="#ff5d5d"/><text x="642" y="507" text-anchor="middle" font-size="12" font-weight="800" fill="#0d1f14">1</text>
+    <text x="660" y="508" font-size="11" font-weight="800" letter-spacing="1.6" fill="#ff7b7b">CRITICAL</text>
+    <text x="636" y="534" font-size="16" font-weight="700" fill="#eaf5ec">Range shrank</text>
+    <text x="636" y="556" class="mono" font-size="13" fill="#ffb3b3">B2:B6 → B2:B5</text>
+
+    <rect x="825" y="480" width="190" height="88" rx="14" fill="#1b1610" stroke="#ff9f43" stroke-opacity=".6"/>
+    <circle cx="847" cy="503" r="10" fill="#ff9f43"/><text x="847" y="507" text-anchor="middle" font-size="12" font-weight="800" fill="#0d1f14">2</text>
+    <text x="865" y="508" font-size="11" font-weight="800" letter-spacing="1.6" fill="#ffb26b">HIGH</text>
+    <text x="841" y="534" font-size="16" font-weight="700" fill="#eaf5ec">Error masked</text>
+    <text x="841" y="556" class="mono" font-size="13" fill="#ffd0a0">IFERROR(B9/B1,0)</text>
+
+    <rect x="1030" y="480" width="190" height="88" rx="14" fill="#1a1a10" stroke="#ffd166" stroke-opacity=".6"/>
+    <circle cx="1052" cy="503" r="10" fill="#ffd166"/><text x="1052" y="507" text-anchor="middle" font-size="12" font-weight="800" fill="#0d1f14">3</text>
+    <text x="1070" y="508" font-size="11" font-weight="800" letter-spacing="1.6" fill="#ffd166">MEDIUM</text>
+    <text x="1046" y="534" font-size="16" font-weight="700" fill="#eaf5ec">Row hidden</text>
+    <text x="1046" y="556" class="mono" font-size="13" fill="#ffe29a">Costs · row 5</text>
+  </g>
+</svg></svg>

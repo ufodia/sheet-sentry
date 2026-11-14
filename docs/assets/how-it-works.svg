@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="t d">
+  <title id="t">How Sheet Sentry reviews an edit</title>
+  <desc id="d">Four steps. One: both workbooks are unzipped and read inside the browser tab. Two: rows are aligned with a longest-common-subsequence match, so inserted and deleted rows are recognised. Three: every original formula is rewritten through that row map, so references Excel moved by itself are not reported. Four: each remaining difference is classified with a kind and a severity. The result is a verdict and Markdown, CSV and JSON reports, and the command line exits non-zero for CI.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0l10 5-10 5z" fill="#9be564"/></marker>
+    <style>
+      .k{font:700 12px 'Segoe UI',Helvetica,Arial,sans-serif;letter-spacing:2px;fill:#9be564}
+      .h{font:700 21px 'Segoe UI',Helvetica,Arial,sans-serif;fill:#eaf5ec}
+      .s{font:14px 'Segoe UI',Helvetica,Arial,sans-serif;fill:#9fb8a6}
+      .m{font:13px 'Cascadia Mono',Consolas,Menlo,monospace;fill:#d9f7c4}
+      .card{fill:#132a1c;stroke:#d6ffde;stroke-opacity:.1}
+      .chip{font:700 13px 'Segoe UI',Helvetica,Arial,sans-serif}
+    </style>
+  </defs>
+  <rect width="1200" height="560" rx="24" fill="#0b1a11"/>
+  <text x="48" y="62" class="k">HOW SHEET SENTRY REVIEWS AN EDIT</text>
+  <text x="48" y="96" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="28" font-weight="750" fill="#eaf5ec">Structure first, then formulas — so moved rows are not mistaken for edits</text>
+
+  <!-- step cards -->
+  <g>
+    <rect class="card" x="48" y="130" width="255" height="250" rx="18"/>
+    <text x="72" y="166" class="k">STEP 1</text>
+    <text x="72" y="196" class="h">Read both files</text>
+    <text class="s"><tspan x="72" y="226">Unzipped in the tab with fflate.</tspan><tspan x="72" y="247">Formulas, cached values,</tspan><tspan x="72" y="268">number formats, names, hidden</tspan><tspan x="72" y="289">rows and sheets. Shared</tspan><tspan x="72" y="310">formulas are expanded.</tspan></text>
+    <rect x="72" y="330" width="206" height="30" rx="8" fill="#0b1a11"/>
+    <text x="84" y="350" class="m">xl/worksheets/*.xml</text>
+  </g>
+  <g>
+    <rect class="card" x="327" y="130" width="255" height="250" rx="18"/>
+    <text x="351" y="166" class="k">STEP 2</text>
+    <text x="351" y="196" class="h">Align the rows</text>
+    <text class="s"><tspan x="351" y="226">Each row gets a signature from</tspan><tspan x="351" y="247">its labels and R1C1 formulas.</tspan><tspan x="351" y="268">A Myers diff pairs the rows, so</tspan><tspan x="351" y="289">an inserted row does not shift</tspan><tspan x="351" y="310">every cell below it.</tspan></text>
+    <g class="m" font-size="12">
+      <rect x="351" y="330" width="96" height="30" rx="8" fill="#0b1a11"/><text x="363" y="350">r4 → r5</text>
+      <rect x="455" y="330" width="103" height="30" rx="8" fill="#7cc4ff" fill-opacity=".15"/><text x="467" y="350" fill="#a9d8ff">+ new r4</text>
+    </g>
+  </g>
+  <g>
+    <rect class="card" x="606" y="130" width="255" height="250" rx="18"/>
+    <text x="630" y="166" class="k">STEP 3</text>
+    <text x="630" y="196" class="h">Remap references</text>
+    <text class="s"><tspan x="630" y="226">Original formulas are rewritten</tspan><tspan x="630" y="247">through the row map. What Excel</tspan><tspan x="630" y="268">would have adjusted by itself is</tspan><tspan x="630" y="289">expected; only the rest is an</tspan><tspan x="630" y="310">edit.</tspan></text>
+    <rect x="630" y="330" width="206" height="30" rx="8" fill="#0b1a11"/>
+    <text x="642" y="350" class="m">=Costs!B6 ⇒ =Costs!B7 ✓</text>
+  </g>
+  <g>
+    <rect class="card" x="885" y="130" width="267" height="250" rx="18"/>
+    <text x="909" y="166" class="k">STEP 4</text>
+    <text x="909" y="196" class="h">Classify the change</text>
+    <g class="chip" font-size="12.5">
+      <rect x="909" y="212" width="231" height="26" rx="8" fill="#ff5d5d" fill-opacity=".14"/>
+      <text x="920" y="229.5" fill="#ff8f8f">Critical · hardcoded, shrunk, #REF!</text>
+      <rect x="909" y="244" width="231" height="26" rx="8" fill="#ff9f43" fill-opacity=".14"/>
+      <text x="920" y="261.5" fill="#ffb26b">High · IFERROR, constants, names</text>
+      <rect x="909" y="276" width="231" height="26" rx="8" fill="#ffd166" fill-opacity=".14"/>
+      <text x="920" y="293.5" fill="#ffd166">Medium · inputs, hidden content</text>
+      <rect x="909" y="308" width="231" height="26" rx="8" fill="#7cc4ff" fill-opacity=".14"/>
+      <text x="920" y="325.5" fill="#a9d8ff">Low · text, formats, additions</text>
+      <rect x="909" y="340" width="231" height="26" rx="8" fill="#8fa596" fill-opacity=".14"/>
+      <text x="920" y="357.5" fill="#b6c8bb">Info · recalculated results</text>
+    </g>
+  </g>
+
+  <!-- arrows between steps -->
+  <g stroke="#9be564" stroke-width="2.2" fill="none" marker-end="url(#arrow)">
+    <path d="M305 255h18"/><path d="M584 255h18"/><path d="M863 255h18"/>
+  </g>
+
+  <!-- outputs -->
+  <path d="M600 384v34" stroke="#9be564" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <rect x="48" y="424" width="1104" height="100" rx="18" fill="#132a1c" stroke="#9be564" stroke-opacity=".35"/>
+  <text x="72" y="458" class="k">RESULT</text>
+  <g class="chip" font-size="14">
+    <rect x="72" y="472" width="104" height="32" rx="16" fill="#ff5d5d" fill-opacity=".18"/><text x="124" y="493" text-anchor="middle" fill="#ff8f8f">Risky edit</text>
+    <rect x="184" y="472" width="124" height="32" rx="16" fill="#ff9f43" fill-opacity=".18"/><text x="246" y="493" text-anchor="middle" fill="#ffb26b">Needs review</text>
+    <rect x="316" y="472" width="104" height="32" rx="16" fill="#7cc4ff" fill-opacity=".18"/><text x="368" y="493" text-anchor="middle" fill="#a9d8ff">Minor</text>
+    <rect x="428" y="472" width="84" height="32" rx="16" fill="#9be564" fill-opacity=".18"/><text x="470" y="493" text-anchor="middle" fill="#c6f0a8">Clean</text>
+  </g>
+  <text x="560" y="466" class="s" fill="#eaf5ec" font-weight="600">Cell-by-cell review in the browser, plus</text>
+  <text x="560" y="492" class="m">review.md · changes.csv · report.json</text>
+  <text x="560" y="514" class="m" fill="#9fb8a6">npm run review -- a.xlsx b.xlsx --fail-on high  → exit 1</text>
+</svg>
