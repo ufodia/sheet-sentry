@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: external || 'http://127.0.0.1:4173',
+    baseURL: external || 'http://127.0.0.1:4175',
     viewport: { width: 1440, height: 1000 },
     browserName: 'chromium',
     // The full Chromium build in new headless mode, which matches the real browser most closely.
@@ -21,9 +21,9 @@ export default defineConfig({
     ? undefined
     : {
         command:
-          'npx vite build --logLevel warn && npx vite preview --host 127.0.0.1 --port 4173 --strictPort',
-        url: 'http://127.0.0.1:4173',
-        reuseExistingServer: !process.env.CI,
+          'npx vite build --logLevel warn && npx vite preview --host 127.0.0.1 --port 4175 --strictPort',
+        url: 'http://127.0.0.1:4175',
+        reuseExistingServer: false,
         timeout: 180_000,
       },
 });

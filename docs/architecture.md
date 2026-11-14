@@ -70,7 +70,7 @@ interface Change {
   originalCell?: string;           // original address, when rows moved
   before?: CellState;
   after?: CellState;
-  expected?: string;               // original formula as Excel would have adjusted it
+  expected?: string;               // original formula through inferred insertions
   detail: string;
   notes: string[];
 }
@@ -82,22 +82,24 @@ interface Change {
 
 `main.ts` keeps a handful of module-level variables (the two loaded workbooks, the comparison, the selected sheet, change, filter and row window) and re-renders the workspace from them with `h()`. Every string from a workbook becomes a text node, so a cell containing markup is displayed, never interpreted.
 
-Comparison runs on the main thread: typical models compare in milliseconds, and the 3-million-cell limit keeps the worst case bounded.
+Comparison runs on the main thread. Populated columns are indexed by row to avoid scanning sparse empty rectangles. The reader bounds file bytes, selected XML bytes, populated cells and aggregate row spans; these are resource limits, not a latency guarantee. Large workbooks can pause the tab. Per-slot request generations prevent late file reads from replacing a newer selection or a reset/demo, and failed replacements clear their prior workbook.
 
 ## The command line
 
-`cli.ts` runs under `tsx`, reads both files from disk, prints `markdownReport` to standard output, optionally writes `--json` and `--csv`, and sets the exit code from `--fail-on`.
+`cli.ts` runs under `tsx`, reads both files from disk, prints `markdownReport` to standard output, optionally writes `--json` and `--csv`, and sets the exit code from `--fail-on`. Unknown, duplicate or missing options are rejected. Before writing, resolved paths and existing file identities prevent report outputs from overwriting inputs or one another, including symlink/hard-link aliases. Usage/read/write errors return `2`; `--help` returns `0`.
 
 ## Report formats
 
 | Report | Contents |
 | --- | --- |
 | Markdown | heading, files and date, verdict, counts table, compared cells and formulas, a table of every non-info change |
-| CSV | `severity,kind,sheet,cell,original_cell,before,after,detail` for every change; values that start with `= + - @` (or tab/carriage return) are prefixed with `'` |
+| CSV | `severity,kind,sheet,cell,original_cell,before,after,detail` for every change; formula-like fields, including leading whitespace/control characters, are prefixed with `'`; quotes, newlines and carriage returns are escaped |
 | JSON | `tool`, `generatedAt`, `files`, `verdict`, `counts`, `compared`, `sheets[] {name,status,rowsInserted,rowsDeleted}`, `changes[] {severity,kind,title,sheet,cell,originalCell,before,after,expectedFormula,detail,notes}` |
 
 ## Tests
 
 - `tests/core.test.ts` — references, alignment, workbook round trips, shared formulas, unsupported files, every planted change in the demo, row-moved references, recalculated outputs, identical workbooks, errors in inserted rows, reports and CSV safety.
 - `tests/hosting.test.mjs` — the production hosting script.
-- `e2e/app.spec.ts` — the real app in Chromium: demo, navigation between sheets, filters, file inputs and unsupported files, identical files, every export, no off-origin requests, and phone layout.
+- `tests/regressions.test.ts` — malformed XML and missing parts, shared-master ordering, sparse sheets, reference semantics, type changes and safe serialization.
+- `tests/cli.test.ts` — option validation, thresholds, report output and input overwrite protection including hard links.
+- `e2e/app.spec.ts` — the real app in Chromium: demo, navigation between sheets, filters, file inputs and unsupported files, failed replacements, pending-read races, markup-as-text, identical files, every export, no off-origin requests during review, and phone layout.

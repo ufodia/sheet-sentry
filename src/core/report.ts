@@ -45,10 +45,10 @@ export function jsonReport(
   );
 }
 
-/** CSV cells starting with = + - @ are prefixed with ' so spreadsheet apps do not execute them. */
+/** Neutralize formula-like fields, including leading whitespace/control characters. */
 const csvCell = (v: string) => {
-  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
-  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  const safe = /^[\s\u0000-\u001f]*[=+\-@]/.test(v) || /^[\t\r\n]/.test(v) ? `'${v}` : v;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
 export function csvReport(result: Comparison): string {
@@ -71,7 +71,7 @@ const VERDICT = {
   risky: 'Risky — critical changes need review before this workbook is used',
   review: 'Review — formulas or structure changed in ways that need a second look',
   minor: 'Minor — values or presentation changed; no formula risks found',
-  clean: 'Clean — no differences beyond recalculated results',
+  clean: 'Clean — no review findings within the supported comparison scope',
 };
 
 export function markdownReport(
@@ -79,11 +79,18 @@ export function markdownReport(
   files: { original: string; edited: string },
   now = new Date(),
 ): string {
-  const esc = (s: string) => s.replace(/\|/g, '\\|');
+  const esc = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\\/g, '\\\\')
+      .replace(/([|*\[\]`_])/g, '\\$1')
+      .replace(/[\r\n]+/g, ' ');
   const lines = [
     '# Sheet Sentry review',
     '',
-    `**${files.original}** → **${files.edited}** · ${now.toISOString().slice(0, 10)}`,
+    `**${esc(files.original)}** → **${esc(files.edited)}** · ${now.toISOString().slice(0, 10)}`,
     '',
     `**Verdict:** ${VERDICT[result.verdict]}`,
     '',
@@ -92,6 +99,7 @@ export function markdownReport(
     `| ${result.counts.critical} | ${result.counts.high} | ${result.counts.medium} | ${result.counts.low} | ${result.counts.info} |`,
     '',
     `${result.compared.cells} cells and ${result.compared.formulas} formulas compared.`,
+    'Review aid only: formulas are not recalculated and unsupported workbook features are not audited.',
     '',
     '## Changes to review',
     '',

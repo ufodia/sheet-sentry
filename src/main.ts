@@ -9,7 +9,7 @@ import {
 } from './core/compare.ts';
 import { address, indexToCol, parseAddress } from './core/refs.ts';
 import { csvReport, jsonReport, markdownReport } from './core/report.ts';
-import { readWorkbook, type Cell, type Workbook } from './core/xlsx.ts';
+import { LIMITS, readWorkbook, type Cell, type Workbook } from './core/xlsx.ts';
 import { demoWorkbooks } from './demo.ts';
 import { byId, download, h } from './dom.ts';
 
@@ -34,7 +34,10 @@ const VERDICT = {
     text: 'Formulas, names or structure changed in ways that deserve a second look.',
   },
   minor: { title: 'Minor changes', text: 'Values or presentation changed. No formula risks were found.' },
-  clean: { title: 'No meaningful changes', text: 'Nothing changed beyond recalculated results.' },
+  clean: {
+    title: 'No meaningful changes',
+    text: 'No review findings within the supported scope. Formulas are not recalculated; this is not a correctness guarantee.',
+  },
 } as const;
 
 interface Loaded {
@@ -50,6 +53,7 @@ let selected: Change | null = null;
 let top = 0;
 let showInfo = false;
 let filter: Severity | 'all' = 'all';
+const requests = { original: 0, edited: 0 };
 
 const intro = byId('intro');
 const workspace = byId('workspace');
@@ -62,7 +66,19 @@ function fail(message: string) {
   introError.hidden = false;
 }
 
-async function load(which: 'original' | 'edited', name: string, bytes: Uint8Array) {
+function clearSlot(which: 'original' | 'edited') {
+  if (which === 'original') original = null;
+  else edited = null;
+  result = null;
+  selected = null;
+  byId(`slot-${which}`).classList.remove('filled');
+  byId(`name-${which}`).textContent = '.xlsx or .xlsm — or drop it here';
+  intro.hidden = false;
+  workspace.hidden = true;
+  workspace.replaceChildren();
+}
+
+function load(which: 'original' | 'edited', name: string, bytes: Uint8Array) {
   introError.hidden = true;
   try {
     const loaded = { name, workbook: readWorkbook(bytes) };
@@ -76,7 +92,21 @@ async function load(which: 'original' | 'edited', name: string, bytes: Uint8Arra
       `${name} · ${sheets.length} sheet${sheets.length === 1 ? '' : 's'} · ${cells.toLocaleString('en')} cells`;
     if (original && edited) run();
   } catch (error) {
+    clearSlot(which);
     fail(`${name}: ${(error as Error).message}`);
+  }
+}
+
+async function loadFile(which: 'original' | 'edited', file: File) {
+  const request = ++requests[which];
+  clearSlot(which);
+  introError.hidden = true;
+  try {
+    if (file.size > LIMITS.files) throw new Error('The file is larger than 50 MB.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (request === requests[which]) load(which, file.name, bytes);
+  } catch (error) {
+    if (request === requests[which]) fail(`${file.name}: ${(error as Error).message}`);
   }
 }
 
@@ -104,7 +134,7 @@ for (const which of ['original', 'edited'] as const) {
   input.addEventListener('change', async () => {
     const file = input.files?.[0];
     input.value = '';
-    if (file) await load(which, file.name, new Uint8Array(await file.arrayBuffer()));
+    if (file) await loadFile(which, file);
   });
   const slot = byId(`slot-${which}`);
   slot.addEventListener('dragover', (e) => {
@@ -117,7 +147,7 @@ for (const which of ['original', 'edited'] as const) {
     e.stopPropagation();
     slot.classList.remove('over');
     const file = e.dataTransfer?.files[0];
-    if (file) await load(which, file.name, new Uint8Array(await file.arrayBuffer()));
+    if (file) await loadFile(which, file);
   });
 }
 window.addEventListener('dragover', (e) => e.preventDefault());
@@ -125,16 +155,15 @@ window.addEventListener('drop', async (e) => {
   e.preventDefault();
   const files = [...(e.dataTransfer?.files ?? [])];
   if (files.length >= 2) {
-    await load('original', files[0].name, new Uint8Array(await files[0].arrayBuffer()));
-    await load('edited', files[1].name, new Uint8Array(await files[1].arrayBuffer()));
-  } else if (files.length === 1)
-    await load(original ? 'edited' : 'original', files[0].name, new Uint8Array(await files[0].arrayBuffer()));
+    await Promise.all([loadFile('original', files[0]), loadFile('edited', files[1])]);
+  } else if (files.length === 1) await loadFile(original ? 'edited' : 'original', files[0]);
 });
 
-byId('demo-button').addEventListener('click', async () => {
+byId('demo-button').addEventListener('click', () => {
+  reset();
   const demo = demoWorkbooks();
-  await load('original', 'q3-budget.xlsx', demo.original);
-  await load('edited', 'q3-budget-ai-edit.xlsx', demo.edited);
+  load('original', 'q3-budget.xlsx', demo.original);
+  load('edited', 'q3-budget-ai-edit.xlsx', demo.edited);
 });
 byId('demo-download').addEventListener('click', () => {
   const demo = demoWorkbooks();
@@ -164,7 +193,7 @@ function formatValue(cell?: Cell | { value?: Cell['value']; format?: string }): 
   if (typeof v === 'string') return v;
   const format = cell.format ?? '';
   if (format.includes('%')) {
-    const decimals = /0\.(0+)%/.exec(format)?.[1].length ?? 0;
+    const decimals = Math.min(10, /0\.(0+)%/.exec(format)?.[1].length ?? 0);
     return `${(v * 100).toFixed(decimals)}%`;
   }
   return Math.abs(v) >= 1000 || Number.isInteger(v)
@@ -406,7 +435,7 @@ function inspector(): HTMLElement {
           h(
             'span',
             { class: 'muted' },
-            'Excel adjusts references for inserted or deleted rows by itself; the edited formula differs from that.',
+            'This formula follows the inferred row insertions. Check the row alignment before accepting the finding.',
           ),
         )
       : null,
@@ -463,6 +492,13 @@ function findingsPanel(r: Comparison): HTMLElement {
     list.length
       ? h('ol', { class: 'changes' }, ...items)
       : h('p', { class: 'muted' }, 'No changes in this view.'),
+    list.length > 400
+      ? h(
+          'p',
+          { class: 'fine' },
+          `Showing the first 400 of ${list.length.toLocaleString('en')} matching findings. Export CSV or JSON for the complete list.`,
+        )
+      : null,
     h(
       'p',
       { class: 'fine' },
@@ -508,10 +544,17 @@ function exportsPanel(r: Comparison): HTMLElement {
 }
 
 function reset() {
+  requests.original++;
+  requests.edited++;
   original = null;
   edited = null;
   result = null;
   selected = null;
+  introError.hidden = true;
+  filter = 'all';
+  showInfo = false;
+  sheetIndex = 0;
+  top = 0;
   for (const which of ['original', 'edited']) {
     byId(`slot-${which}`).classList.remove('filled');
     byId(`name-${which}`).textContent = '.xlsx or .xlsm — or drop it here';

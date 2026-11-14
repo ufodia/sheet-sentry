@@ -127,7 +127,7 @@ export interface Change {
   originalCell?: string;
   before?: CellState;
   after?: CellState;
-  /** The original formula as Excel itself would have rewritten it for inserted or deleted rows, when that differs. */
+  /** Original formula remapped through inferred row insertions, when that differs. */
   expected?: string;
   detail: string;
   /** Every aspect detected for this cell, most severe first. */
@@ -158,16 +158,31 @@ const rank = (s: Severity) => ORDER.indexOf(s);
 const valueText = (v: Cell['value']) =>
   v === undefined ? '' : typeof v === 'number' ? String(+v.toPrecision(12)) : String(v);
 
-function rowSignature(sheet: Sheet, row: number): string {
-  const parts: string[] = [];
-  for (let c = 0; c < sheet.cols; c++) {
-    const cell = sheet.cells.get(address(c, row));
-    if (!cell) continue;
-    parts.push(
-      `${c}=${cell.formula !== undefined ? 'F' + toR1C1(cell.formula, row, c) : 'V' + valueText(cell.value)}`,
-    );
+/** Index populated columns once; sparse sheets must not scan their entire bounding rectangle. */
+function rowColumns(sheet: Sheet): Map<number, number[]> {
+  const rows = new Map<number, number[]>();
+  for (const ref of sheet.cells.keys()) {
+    const { row, col } = parseAddress(ref);
+    const columns = rows.get(row) ?? [];
+    columns.push(col);
+    rows.set(row, columns);
   }
-  return parts.join('|');
+  for (const columns of rows.values()) columns.sort((a, b) => a - b);
+  return rows;
+}
+
+function rowSignatures(sheet: Sheet, columns: Map<number, number[]>): string[] {
+  const signatures = Array<string>(sheet.rows).fill('');
+  for (const [row, cols] of columns)
+    signatures[row] = JSON.stringify(
+      cols.map((col) => {
+        const cell = sheet.cells.get(address(col, row))!;
+        return cell.formula !== undefined
+          ? [col, 'f', toR1C1(cell.formula, row, col)]
+          : [col, cell.type, cell.value];
+      }),
+    );
+  return signatures;
 }
 
 function sameNumber(a: unknown, b: unknown): boolean {
@@ -175,6 +190,10 @@ function sameNumber(a: unknown, b: unknown): boolean {
     return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
   return a === b;
 }
+
+const sameValue = (a: Cell, b: Cell) => a.type === b.type && sameNumber(a.value, b.value);
+const referenceError = (cell: Cell) =>
+  cell.type === 'e' || /#REF!/i.test((cell.formula ?? '').replace(/"(?:[^"]|"")*"/g, ''));
 
 const describeValue = (v: Cell['value']) =>
   v === undefined ? '(no cached value)' : typeof v === 'string' ? `"${v}"` : valueText(v);
@@ -313,14 +332,21 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
   // Row alignment for every matched sheet, so cross-sheet references can be remapped too.
   const ops = new Map<string, RowOp[]>();
   const mappers = new Map<string, (row: number) => number>();
+  const deletedFrom = new Map<string, number>();
+  const columns = new Map<Sheet, Map<number, number[]>>();
+  for (const sheet of [...original.sheets, ...edited.sheets]) columns.set(sheet, rowColumns(sheet));
   for (const sheet of original.sheets) {
     const other = editedByName.get(sheet.name);
     if (!other) continue;
-    const sa = Array.from({ length: sheet.rows }, (_, r) => rowSignature(sheet, r));
-    const sb = Array.from({ length: other.rows }, (_, r) => rowSignature(other, r));
+    const sa = rowSignatures(sheet, columns.get(sheet)!);
+    const sb = rowSignatures(other, columns.get(other)!);
     const o = alignRows(sa, sb);
     ops.set(sheet.name, o);
-    mappers.set(sheet.name, rowMapper(o, sheet.rows));
+    const firstDeleted = o.find((op) => op.type === 'deleted');
+    if (firstDeleted?.type === 'deleted') deletedFrom.set(sheet.name.toLowerCase(), firstDeleted.a);
+    // A deleted cell becomes #REF!, while range endpoints shrink differently. Do not
+    // silently equate either with the next surviving cell: flag affected references.
+    else mappers.set(sheet.name.toLowerCase(), rowMapper(o, sheet.rows));
   }
   const identity = (r: number) => r;
 
@@ -346,6 +372,17 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
     };
     if (!before) {
       add({ kind: 'sheet-added', sheet: sheet.name, detail: `${sheet.cells.size} cell(s)` });
+      for (const [ref, cell] of sheet.cells)
+        if (referenceError(cell))
+          mark(
+            add({
+              kind: 'error-introduced',
+              sheet: sheet.name,
+              cell: ref,
+              after: state(cell),
+              detail: `A new sheet contains an error at ${ref}.`,
+            }),
+          );
       continue;
     }
     if (before.state === 'visible' && sheet.state !== 'visible')
@@ -362,7 +399,7 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
 
     const rowOps = ops.get(sheet.name)!;
     const remap = (row: number, sheetName?: string) =>
-      (mappers.get(sheetName ?? sheet.name) ?? identity)(row);
+      (mappers.get((sheetName ?? sheet.name).toLowerCase()) ?? identity)(row);
     const breaksBefore = patternBreaks(before);
     const breaksAfter = patternBreaks(sheet);
 
@@ -389,11 +426,11 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
       });
       // New rows have no "before", but an error in them is still new.
       for (let r = r0; r <= r1; r++)
-        for (let c = 0; c < sheet.cols; c++) {
+        for (const c of columns.get(sheet)!.get(r) ?? []) {
           const ref = address(c, r);
           const cell = sheet.cells.get(ref);
           if (!cell) continue;
-          if (cell.type === 'e' || cell.formula?.includes('#REF!'))
+          if (referenceError(cell))
             mark(
               add({
                 kind: 'error-introduced',
@@ -427,8 +464,11 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
           }),
         );
       }
-      const cols = Math.max(before.cols, sheet.cols);
-      for (let c = 0; c < cols; c++) {
+      const cols = new Set([
+        ...(columns.get(before)!.get(op.a) ?? []),
+        ...(columns.get(sheet)!.get(op.b) ?? []),
+      ]);
+      for (const c of [...cols].sort((a, b) => a - b)) {
         const ref = address(c, op.b);
         const oref = address(c, op.a);
         const a = before.cells.get(oref);
@@ -454,7 +494,7 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
         if (!a && b) {
           mark(
             add({
-              kind: 'cell-added',
+              kind: referenceError(b) ? 'error-introduced' : 'cell-added',
               ...base,
               detail:
                 b.formula !== undefined ? `New formula =${b.formula}` : `New value ${describeValue(b.value)}`,
@@ -474,7 +514,7 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
           );
           continue;
         }
-        if (y.formula?.includes('#REF!') && !x.formula?.includes('#REF!')) {
+        if (referenceError(y) && !referenceError(x)) {
           mark(
             add({ kind: 'error-introduced', ...base, detail: `The formula lost a reference: =${y.formula}` }),
           );
@@ -523,16 +563,27 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
             );
             continue;
           }
+          if (
+            ranges(x.formula).some((r) => {
+              const firstDeleted = deletedFrom.get((r.sheet ?? sheet.name).toLowerCase());
+              return firstDeleted !== undefined && (r.r1 < 0 || r.r1 >= firstDeleted);
+            })
+          ) {
+            mark(
+              add({
+                kind: 'references-changed',
+                ...base,
+                detail:
+                  'Rows were deleted from a referenced sheet. Review this reference against the original; deletion remapping is intentionally conservative.',
+              }),
+            );
+            continue;
+          }
           if (breaksAfter.has(ref) && !breaksBefore.has(oref)) {
             mark(add({ kind: 'pattern-break', ...base, detail: breaksAfter.get(ref)! }));
             continue;
           }
-          if (
-            x.value !== undefined &&
-            y.value !== undefined &&
-            !sameNumber(x.value, y.value) &&
-            valueText(x.value) !== valueText(y.value)
-          )
+          if (x.value !== undefined && y.value !== undefined && !sameValue(x, y))
             mark(
               add({
                 kind: 'output-changed',
@@ -540,7 +591,7 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
                 detail: `${describeValue(x.value)} → ${describeValue(y.value)}`,
               }),
             );
-        } else if (!sameNumber(x.value, y.value) && valueText(x.value) !== valueText(y.value)) {
+        } else if (!sameValue(x, y)) {
           const numeric = typeof x.value === 'number' && typeof y.value === 'number';
           const pct =
             numeric && x.value !== 0

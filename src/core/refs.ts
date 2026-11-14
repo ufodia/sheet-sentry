@@ -36,7 +36,11 @@ export const address = (col: number, row: number) => `${indexToCol(col)}${row + 
 export function parseAddress(a1: string): { col: number; row: number } {
   const m = /^\$?([A-Z]{1,3})\$?(\d+)$/i.exec(a1);
   if (!m) throw new Error(`Invalid cell address ${a1}`);
-  return { col: colToIndex(m[1]), row: Number(m[2]) - 1 };
+  const col = colToIndex(m[1]);
+  const row = Number(m[2]) - 1;
+  if (!Number.isSafeInteger(row) || row < 0 || row >= 1_048_576 || col >= 16_384)
+    throw new Error(`Cell address ${a1} is outside Excel's worksheet bounds`);
+  return { col, row };
 }
 
 /** One token of a reference expression: a single cell, a range, or a whole row/column range. */
@@ -71,6 +75,17 @@ export function findRefs(formula: string): RefToken[] {
   let i = 0;
   while (i < formula.length) {
     const ch = formula[i];
+    if (ch === '[') {
+      // Structured table column labels can look like A1 addresses. Leave them intact.
+      let depth = 1;
+      while (++i < formula.length && depth) {
+        if (formula[i] === '[') depth++;
+        if (formula[i] === ']') depth--;
+      }
+      const external = /^[A-Za-z_][\w.]*![A-Za-z$0-9:]+/.exec(formula.slice(i));
+      if (external) i += external[0].length;
+      continue;
+    }
     if (ch === '"') {
       i++;
       while (i < formula.length && !(formula[i] === '"' && formula[i + 1] !== '"'))
@@ -167,11 +182,19 @@ export function mapRefs(formula: string, map: (ref: CellRef) => CellRef): string
   const tokens = findRefs(formula);
   let out = '';
   let pos = 0;
+  const mappedText = (ref: CellRef) => {
+    const mapped = map(ref);
+    if (
+      (ref.row >= 0 && (mapped.row < 0 || mapped.row >= 1_048_576)) ||
+      (ref.col >= 0 && (mapped.col < 0 || mapped.col >= 16_384))
+    )
+      return '#REF!';
+    return cellText(mapped);
+  };
   for (const t of tokens) {
     out += formula.slice(pos, t.start);
-    const a = map(t.a);
-    out += sheetText(t.sheet) + cellText(a);
-    if (t.b) out += ':' + cellText(map(t.b));
+    out += sheetText(t.sheet) + mappedText(t.a);
+    if (t.b) out += ':' + mappedText(t.b);
     pos = t.end;
   }
   return out + formula.slice(pos);
@@ -203,13 +226,22 @@ export function toR1C1(formula: string, row: number, col: number): string {
   return normalize(out + formula.slice(pos));
 }
 
-/** Canonical text for comparison: no whitespace outside strings, upper-case outside strings. */
+/** Canonical text, preserving quoted sheet names and possible intersection operators. */
 export function normalize(formula: string): string {
   let out = '';
   let inString = false;
-  for (const ch of formula.replace(/^=/, '')) {
-    if (ch === '"') inString = !inString;
-    out += inString || ch === '"' ? ch : /\s/.test(ch) ? '' : ch.toUpperCase();
+  let inSheet = false;
+  let space = false;
+  for (const ch of formula.replace(/^=/, '').trim()) {
+    if (!inString && !inSheet && /\s/.test(ch)) {
+      space = true;
+      continue;
+    }
+    if (space && /[\w$)\]']/.test(out.at(-1) ?? '') && /[\w$('\[]/.test(ch)) out += ' ';
+    space = false;
+    if (ch === '"' && !inSheet) inString = !inString;
+    if (ch === "'" && !inString) inSheet = !inSheet;
+    out += inString || ch === '"' ? ch : ch.toUpperCase();
   }
   return out;
 }

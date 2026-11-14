@@ -22,15 +22,15 @@ The bar at the top names both files and gives one of four verdicts:
 | **Risky edit** | at least one critical change — hardcoded formulas, shrunken ranges or new errors |
 | **Needs review** | formulas, names or structure changed in ways that deserve a second look |
 | **Minor changes** | values or presentation changed; no formula risks found |
-| **No meaningful changes** | nothing beyond recalculated results |
+| **No meaningful changes** | no review findings within the supported scope; a correctness guarantee is not implied |
 
 The five counters show how many changes each severity has. **Click a counter** to list only that severity; click it again to return to the full list.
 
 ## 3. Review changes
 
-**Changes to review** (right, or below on a phone) lists every change from most to least severe. Each entry shows the kind of change, the sheet and cell, and a one-line explanation. Click an entry to open its sheet and select its cell.
+**Changes to review** (right, or below on a phone) lists up to 400 matching changes from most to least severe. Export CSV or JSON for the complete list. Each entry shows the kind, sheet and cell, and an explanation. Click an entry to open its sheet and select its cell.
 
-Recalculated results (info) are hidden by default because they are consequences, not edits. Tick **Show recalculated results** to see them; they then also get a thin grey outline on the sheet.
+Cached-result differences under an unchanged or insertion-remapped formula are info findings, hidden by default. The app does not recalculate or establish their cause. Tick **Show recalculated results** to see them; they then also get a thin grey outline on the sheet.
 
 ### The sheet view
 
@@ -52,7 +52,7 @@ Select an outlined cell to see:
 
 - **Before** — the original formula (or *(constant)*) and its value. When rows were inserted or deleted, the label shows where the cell was in the original, e.g. *Before · B6*.
 - **After** — the edited formula or constant and its value.
-- **Expected after the row changes** — for formulas affected by inserted or deleted rows: the formula Excel would have produced by itself. The difference between this and *After* is what the edit really changed.
+- **Expected after the row changes** — a formula inferred from supported row insertions. Check the row alignment before treating it as the intended formula. Deleted-row references are flagged conservatively for manual review.
 - **Notes** — every aspect detected, e.g. *B2:B6 became B2:B5: 1 cell(s) dropped*.
 
 ## 4. Export
@@ -80,6 +80,9 @@ The Markdown review goes to standard output. Exit code `0` means nothing reached
 | *…legacy .xls file or a password-protected workbook…* | save an unprotected copy as `.xlsx` in Excel or LibreOffice |
 | *could not be unzipped* / *no workbook part* | the file is not an Excel workbook, or it is damaged |
 | *larger than 50 MB* / *more than 3 million cells* | split the workbook or remove unused sheets |
+| *combined worksheet row spans exceed 1.5 million rows* | remove distant unused rows or split the file; the budget includes each sheet's highest populated or hidden row |
+| *missing or unsupported* / *shared formula … has no definition* | resave an unprotected copy in Excel; the reader refuses to compare incomplete or unsupported parts |
 | Values are empty but formulas are shown | the file was saved without calculated values (common for files written by scripts); open and save it in Excel |
 | Almost every cell in a sheet is reported | a column was inserted or deleted, or the sheet was rebuilt; columns are compared by position |
 | A sheet shows as removed and another as added | the sheet was renamed |
+| References are flagged after row deletion | verify them manually; the tool intentionally avoids equating a deleted cell with its next surviving neighbour |

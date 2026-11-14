@@ -10,7 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import config from './screenshots.config.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const port = 4319;
+const port = 4325;
 const base = `http://127.0.0.1:${port}/`;
 
 const server = spawn(

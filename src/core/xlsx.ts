@@ -33,21 +33,36 @@ export interface Workbook {
 
 export class WorkbookError extends Error {}
 
-export const LIMITS = { files: 50 * 1024 * 1024, xml: 300 * 1024 * 1024, cells: 3_000_000 };
+export const LIMITS = {
+  files: 50 * 1024 * 1024,
+  xml: 300 * 1024 * 1024,
+  cells: 3_000_000,
+  rowSlots: 1_500_000,
+};
 
 const ENTITY: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 export const decodeXml = (s: string) =>
-  s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) =>
-    e[0] === '#'
-      ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
-      : (ENTITY[e] ?? m),
-  );
+  s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) => {
+    if (e[0] !== '#') return ENTITY[e] ?? m;
+    const code = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+    if (
+      !Number.isSafeInteger(code) ||
+      !(
+        (code >= 0x20 && code <= 0xd7ff) ||
+        (code >= 0xe000 && code <= 0x10ffff) ||
+        [9, 10, 13].includes(code)
+      )
+    )
+      throw new WorkbookError('The workbook contains an invalid XML character reference.');
+    return String.fromCodePoint(code);
+  });
 const encodeXml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function attrs(tag: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const m of tag.matchAll(/([\w:]+)="([^"]*)"/g)) out[m[1]] = decodeXml(m[2]);
+  for (const m of tag.matchAll(/([\w:]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g))
+    out[m[1]] = decodeXml(m[2] ?? m[3]);
   return out;
 }
 
@@ -124,13 +139,18 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
     throw new WorkbookError('The workbook could not be unzipped.');
   }
   names = names.map((n) => n.replace(/\\/g, '/'));
-  const text = (path: string) => (files[path] ? strFromU8(files[path]) : '');
+  const text = (path: string) => {
+    const xml = files[path] ? strFromU8(files[path]) : '';
+    if (/<!DOCTYPE|<!ENTITY/i.test(xml))
+      throw new WorkbookError('XML document types and entity declarations are not supported.');
+    return xml;
+  };
   const workbookXml = text('xl/workbook.xml');
   if (!workbookXml) throw new WorkbookError('The file has no workbook part; it may not be a spreadsheet.');
 
   // Shared strings: plain or rich text runs.
   const shared: string[] = [];
-  for (const m of text('xl/sharedStrings.xml').matchAll(/<si>([\s\S]*?)<\/si>/g)) {
+  for (const m of text('xl/sharedStrings.xml').matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g)) {
     const runs = [...m[1].matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((t) => decodeXml(t[1]));
     shared.push(runs.join(''));
   }
@@ -149,10 +169,14 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
   });
 
   // Sheet list and relationships.
-  const rels = new Map<string, string>();
+  const rels = new Map<string, { path: string; chart: boolean }>();
   for (const m of text('xl/_rels/workbook.xml.rels').matchAll(/<Relationship\s[^>]*>/g)) {
     const a = attrs(m[0]);
-    rels.set(a.Id, resolvePath('xl/workbook.xml', a.Target));
+    if (!a.Id || !a.Target || a.TargetMode === 'External') continue;
+    rels.set(a.Id, {
+      path: resolvePath('xl/workbook.xml', a.Target),
+      chart: a.Type?.endsWith('/chartsheet') ?? false,
+    });
   }
   const definedNames = new Map<string, string>();
   for (const m of workbookXml.matchAll(/<definedName\s([^>]*)>([\s\S]*?)<\/definedName>/g)) {
@@ -163,11 +187,14 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
   }
 
   let cellCount = 0;
+  let rowSlots = 0;
   const sheets: Sheet[] = [];
   for (const m of workbookXml.matchAll(/<sheet\s[^>]*>/g)) {
     const a = attrs(m[0]);
-    const path = rels.get(a['r:id']);
-    const xml = path ? text(path) : '';
+    if (!a.name || sheets.some((sheet) => sheet.name.toLowerCase() === a.name.toLowerCase()))
+      throw new WorkbookError('The workbook contains a missing or duplicate sheet name.');
+    const relationship = rels.get(a['r:id']);
+    const xml = relationship ? text(relationship.path) : '';
     const sheet: Sheet = {
       name: a.name,
       state: a.state === 'hidden' ? 'hidden' : a.state === 'veryHidden' ? 'veryHidden' : 'visible',
@@ -176,19 +203,36 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
       cols: 0,
       hiddenRows: new Set(),
     };
-    if (!xml) {
-      sheets.push(sheet); // chart sheets and missing parts are listed without cells
+    if (relationship?.chart) {
+      sheets.push(sheet); // Chart content is outside the comparison scope.
       continue;
     }
+    if (!xml || !/<worksheet(?:\s|>)/.test(xml))
+      throw new WorkbookError(`The worksheet part for "${a.name}" is missing or unsupported.`);
     const sharedFormulas = new Map<string, { formula: string; row: number; col: number }>();
+    const sharedFollowers: { ref: string; id: string; row: number; col: number }[] = [];
     for (const row of xml.matchAll(/<row\s([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
       const ra = attrs(`<r ${row[1]}>`);
-      if (ra.hidden === '1' || ra.hidden === 'true') sheet.hiddenRows.add(Number(ra.r) - 1);
+      if (ra.hidden === '1' || ra.hidden === 'true') {
+        const r = Number(ra.r) - 1;
+        if (!Number.isSafeInteger(r) || r < 0 || r >= 1_048_576)
+          throw new WorkbookError(`Invalid hidden-row address in "${a.name}".`);
+        sheet.hiddenRows.add(r);
+        sheet.rows = Math.max(sheet.rows, r + 1);
+      }
       if (!row[2]) continue;
       for (const c of row[2].matchAll(/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
         const ca = attrs(`<c ${c[1]}>`);
-        if (!ca.r) continue;
-        const { col, row: r } = parseAddress(ca.r);
+        if (!ca.r) throw new WorkbookError(`A cell in "${a.name}" has no address.`);
+        let col: number;
+        let r: number;
+        try {
+          ({ col, row: r } = parseAddress(ca.r));
+        } catch (error) {
+          throw new WorkbookError((error as Error).message);
+        }
+        const ref = address(col, r);
+        if (sheet.cells.has(ref)) throw new WorkbookError(`Duplicate cell ${a.name}!${ref}.`);
         const body = c[2] ?? '';
         const fTag = /<f(\s[^>]*)?(?:\/>|>([\s\S]*?)<\/f>)/.exec(body);
         let formula: string | undefined;
@@ -197,27 +241,34 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
           const ftext = fTag[2] !== undefined ? decodeXml(fTag[2]) : '';
           if (fa.t === 'shared' && fa.si !== undefined) {
             if (ftext) {
+              if (sharedFormulas.has(fa.si))
+                throw new WorkbookError(`Duplicate shared-formula definition in "${a.name}".`);
               sharedFormulas.set(fa.si, { formula: ftext, row: r, col });
               formula = ftext;
             } else {
-              const master = sharedFormulas.get(fa.si);
-              if (master) formula = shiftFormula(master.formula, r - master.row, col - master.col);
+              // A shared master may occur later in the XML. Resolve after reading the sheet.
+              sharedFollowers.push({ ref, id: fa.si, row: r, col });
+              formula = '';
             }
-          } else formula = ftext || undefined;
+          } else if (ftext) formula = ftext;
+          else throw new WorkbookError(`An unsupported empty formula was found at ${a.name}!${ref}.`);
         }
         const raw = /<v>([\s\S]*?)<\/v>/.exec(body)?.[1];
         const inline = /<is>([\s\S]*?)<\/is>/.exec(body)?.[1];
         let value: Cell['value'];
         let type: Cell['type'] = 'n';
         if (ca.t === 's' && raw !== undefined) {
-          value = shared[Number(raw)] ?? '';
+          const index = Number(raw);
+          if (!Number.isInteger(index) || index < 0 || index >= shared.length)
+            throw new WorkbookError(`Invalid shared-string index at ${a.name}!${ref}.`);
+          value = shared[index];
           type = 's';
         } else if (ca.t === 'inlineStr' && inline !== undefined) {
           value = [...inline.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)]
             .map((t) => decodeXml(t[1]))
             .join('');
           type = 's';
-        } else if (ca.t === 'str' && raw !== undefined) {
+        } else if ((ca.t === 'str' || ca.t === 'd') && raw !== undefined) {
           value = decodeXml(raw);
           type = 's';
         } else if (ca.t === 'b' && raw !== undefined) {
@@ -228,12 +279,17 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
           type = 'e';
         } else if (raw !== undefined) {
           value = Number(raw);
+          if (!raw.trim() || !Number.isFinite(value))
+            throw new WorkbookError(`Invalid numeric value at ${a.name}!${ref}.`);
         }
         if (formula === undefined && value === undefined) continue; // styled but empty
         if (++cellCount > LIMITS.cells)
           throw new WorkbookError('The workbook has more than 3 million cells.');
-        const format = ca.s !== undefined ? styleFormats[Number(ca.s)] : undefined;
-        sheet.cells.set(address(col, r), {
+        const style = ca.s === undefined ? 0 : Number(ca.s);
+        if (!Number.isInteger(style) || style < 0 || (style > 0 && styleFormats[style] === undefined))
+          throw new WorkbookError(`Invalid number-format style at ${a.name}!${ref}.`);
+        const format = styleFormats[style];
+        sheet.cells.set(ref, {
           formula,
           value,
           type,
@@ -243,6 +299,19 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
         sheet.cols = Math.max(sheet.cols, col + 1);
       }
     }
+    for (const follower of sharedFollowers) {
+      const master = sharedFormulas.get(follower.id);
+      if (!master)
+        throw new WorkbookError(`The shared formula at ${a.name}!${follower.ref} has no definition.`);
+      sheet.cells.get(follower.ref)!.formula = shiftFormula(
+        master.formula,
+        follower.row - master.row,
+        follower.col - master.col,
+      );
+    }
+    rowSlots += sheet.rows;
+    if (rowSlots > LIMITS.rowSlots)
+      throw new WorkbookError('The combined worksheet row spans exceed 1.5 million rows.');
     sheets.push(sheet);
   }
   if (!sheets.length) throw new WorkbookError('The workbook has no sheets.');
@@ -297,7 +366,12 @@ export function writeWorkbook(sheets: SheetSpec[], names: Record<string, string>
       else if (typeof spec === 'string') xml = `<c r="${ref}" t="s"><v>${sst(spec)}</v></c>`;
       else if ('f' in spec) {
         const style = spec.fmt === 'percent' ? ' s="1"' : '';
-        const t = typeof spec.v === 'string' ? (spec.v.startsWith('#') ? ' t="e"' : ' t="str"') : '';
+        const error =
+          typeof spec.v === 'string' &&
+          /^#(?:NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A|GETTING_DATA|SPILL!|CALC!|CONNECT!|BLOCKED!|UNKNOWN!|FIELD!|BUSY!)$/.test(
+            spec.v,
+          );
+        const t = typeof spec.v === 'string' ? (error ? ' t="e"' : ' t="str"') : '';
         xml = `<c r="${ref}"${style}${t}><f>${encodeXml(spec.f)}</f>${spec.v !== undefined ? `<v>${encodeXml(String(spec.v))}</v>` : ''}</c>`;
       } else xml = `<c r="${ref}" s="1"><v>${spec.v}</v></c>`;
       if (!byRow.has(row)) byRow.set(row, []);

@@ -11,6 +11,8 @@ Budgets, forecasts, salaries and board packs are some of the most sensitive file
 | Local exports | Markdown, CSV and JSON files are created in the tab and saved through the browser's downloads. |
 | Command line | Reads the two files you name and writes only the `--json`/`--csv` files you ask for. No network access. |
 
+Loading the application contacts the host for its own assets. External GitHub and Buy Me a Coffee links open their respective services when you choose them. `connect-src` blocks scripted data connections; it does not prevent ordinary navigation to an external link. README badges are GitHub documentation assets, not dependencies of the running application.
+
 ## What remains your responsibility
 
 - **Exports** contain sheet names, cell addresses, formulas and values from your workbooks. Share them as you would the workbook.

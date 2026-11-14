@@ -100,6 +100,56 @@ test('identical workbooks are clean', async ({ page }) => {
   await expect(page.locator('.findings')).toContainText('No changes in this view.');
 });
 
+test('a failed replacement clears its slot rather than comparing stale input', async ({ page }) => {
+  await loadDemo(page);
+  await page.locator('#file-original').setInputFiles({
+    name: 'broken.xlsx',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.from('broken'),
+  });
+  await expect(page.locator('#intro-error')).toBeVisible();
+  await expect(page.locator('#slot-original')).not.toHaveClass(/filled/);
+  await page.locator('#file-edited').setInputFiles({
+    name: 'new-edited.xlsx',
+    mimeType: 'application/octet-stream',
+    buffer: await readFile('examples/q3-budget.xlsx'),
+  });
+  await expect(page.locator('#intro')).toBeVisible();
+  await expect(page.locator('#workspace')).toBeHidden();
+});
+
+test('a pending file read cannot replace a newer demo or comparison', async ({ page }) => {
+  await page.addInitScript(() => {
+    const read = File.prototype.arrayBuffer;
+    File.prototype.arrayBuffer = async function () {
+      if (this.name === 'slow.xlsx') await new Promise((resolve) => setTimeout(resolve, 600));
+      return read.call(this);
+    };
+  });
+  await page.goto('/');
+  await page.locator('#file-original').setInputFiles({
+    name: 'slow.xlsx',
+    mimeType: 'application/octet-stream',
+    buffer: await readFile('examples/q3-budget.xlsx'),
+  });
+  await page.getByRole('button', { name: 'Review the demo budget' }).click();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.verdict-bar .eyebrow')).toHaveText('q3-budget.xlsx → q3-budget-ai-edit.xlsx');
+  await expect(page.locator('.verdict-bar h1')).toHaveText('Risky edit');
+});
+
+test('workbook markup is rendered as text and never interpreted', async ({ page }) => {
+  await loadDemo(page);
+  // Names are also untrusted workbook data; a hostile filename must stay a text node.
+  await page.locator('#file-edited').setInputFiles({
+    name: '<img src=x onerror=alert(1)>.xlsx',
+    mimeType: 'application/octet-stream',
+    buffer: await readFile('examples/q3-budget-ai-edit.xlsx'),
+  });
+  await expect(page.locator('.verdict-bar .eyebrow')).toContainText('<img src=x onerror=alert(1)>.xlsx');
+  await expect(page.locator('.verdict-bar img')).toHaveCount(0);
+});
+
 test('exports and the demo files are generated in the tab', async ({ page }) => {
   await loadDemo(page);
   const [md] = await Promise.all([

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="60" viewBox="0 0 300 60" role="img" aria-labelledby="title">
+  <title id="title">Buy Me a Coffee — support ufodia</title>
+  <rect x=".5" y=".5" width="299" height="59" rx="14" fill="#ffd166" stroke="#ffe3a3"/>
+  <path d="M27 23h22v14a9 9 0 0 1-9 9h-4a9 9 0 0 1-9-9zm22 3h4a5 5 0 0 1 0 10h-4M24 48h31M33 17v-5m10 5v-5" fill="none" stroke="#15241b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="75" y="28" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" fill="#15241b">Buy Me a Coffee</text>
+  <text x="76" y="45" font-family="Segoe UI,Arial,sans-serif" font-size="12" letter-spacing="1.2" fill="#374d3d">SUPPORT UFODIA</text>
+</svg>
