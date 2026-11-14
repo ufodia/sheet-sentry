@@ -1,0 +1,60 @@
+{
+  "name": "sheet-sentry",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Compare an original .xlsx with its AI-edited version: hardcoded formulas, shrunken ranges, hidden errors, broken patterns and structural changes, all in your browser.",
+  "license": "MIT",
+  "author": "ufodia",
+  "homepage": "https://github.com/ufodia/sheet-sentry#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ufodia/sheet-sentry.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ufodia/sheet-sentry/issues"
+  },
+  "funding": "https://buymeacoffee.com/ufodia",
+  "keywords": [
+    "excel",
+    "spreadsheet",
+    "xlsx",
+    "ai-agents",
+    "finance",
+    "audit",
+    "diff",
+    "typescript"
+  ],
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "postbuild": "npm run prepare:hosting",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "playwright test",
+    "check": "npm run typecheck && npm test && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare:hosting": "node scripts/prepare-hosting.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "review": "tsx src/cli.ts",
+    "demo-files": "tsx scripts/write-demo.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.10.1",
+    "prettier": "3.10.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  },
+  "dependencies": {
+    "fflate": "0.8.3"
+  }
+}
