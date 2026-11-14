@@ -293,6 +293,14 @@ To restore on a replacement computer, clone the repository, install Node.js 24, 
 
 Created and maintained by **[ufodia](https://github.com/ufodia)**, currently the sole contributor. Source, documentation, demo workbooks and original illustrations are available under MIT; dependency attribution is preserved in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+## More from ufodia
+
+Explore more open-source tools by [ufodia](https://github.com/ufodia):
+
+- [Agent Crash Lab](https://github.com/ufodia/agent-crash-lab) — rehearse failures and recovery in simulated AI workflows.
+- [CutOnce](https://github.com/ufodia/cutonce) — plan rectangular parts on irregular material offcuts in your browser.
+- [Browse all repositories](https://github.com/ufodia?tab=repositories).
+
 ## Support
 
 Sheet Sentry is free and has no ads. If it caught a hardcoded total before it reached a board deck, a coffee keeps it maintained.
