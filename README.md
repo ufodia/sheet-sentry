@@ -5,6 +5,7 @@
 <h3 align="center">An AI “tidied up” your spreadsheet. Did it hardcode a total, shrink a SUM or hide an error? Find out before anyone uses the numbers.</h3>
 
 <p align="center">
+  <a href="https://sheet-sentry.vercel.app/"><b>Live demo ↗</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="#what-it-catches">What it catches</a> ·
   <a href="#how-it-works">How it works</a> ·
