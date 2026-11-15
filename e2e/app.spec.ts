@@ -129,36 +129,28 @@ test('inserted last budget row is included in the total', async ({ page }) => {
     return Buffer.from(writeWorkbook([{ name: 'Budget', cells }]));
   };
   await page.goto('/');
-  await page
-    .locator('#file-original')
-    .setInputFiles({
-      name: 'before.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: make(false, 'SUM(B2:B3)'),
-    });
-  await page
-    .locator('#file-edited')
-    .setInputFiles({
-      name: 'after.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: make(true, 'SUM(B2:B4)'),
-    });
+  await page.locator('#file-original').setInputFiles({
+    name: 'before.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: make(false, 'SUM(B2:B3)'),
+  });
+  await page.locator('#file-edited').setInputFiles({
+    name: 'after.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: make(true, 'SUM(B2:B4)'),
+  });
   await expect(page.locator('.verdict-bar h1')).toHaveText('No meaningful changes');
   await page.getByRole('button', { name: 'New comparison' }).click();
-  await page
-    .locator('#file-original')
-    .setInputFiles({
-      name: 'before.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: make(false, 'SUM(B2:B3)'),
-    });
-  await page
-    .locator('#file-edited')
-    .setInputFiles({
-      name: 'after.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: make(true, 'SUM(B2:B3)'),
-    });
+  await page.locator('#file-original').setInputFiles({
+    name: 'before.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: make(false, 'SUM(B2:B3)'),
+  });
+  await page.locator('#file-edited').setInputFiles({
+    name: 'after.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: make(true, 'SUM(B2:B3)'),
+  });
   await expect(page.locator('.verdict-bar h1')).toHaveText('Risky edit');
   await expect(page.locator('.inspector h2')).toHaveText('Range no longer covers all rows');
 });
