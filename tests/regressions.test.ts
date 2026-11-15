@@ -28,6 +28,31 @@ const compare = (
   );
 
 describe('workbook parsing regressions', () => {
+  it('distinguishes uncached formula results from false, errors and empty strings', () => {
+    const sheet = readWorkbook(
+      fixture(`<worksheet><sheetData><row r="1">
+      <c r="A1" t="b"><f>1=1</f><v></v></c>
+      <c r="B1" t="e"><f>1/0</f><v> </v></c>
+      <c r="C1" t="s"><f>"test"</f><v></v></c>
+      <c r="D1" t="b"><f>1=1</f><v>1</v></c>
+      <c r="E1" t="b"><f>1=0</f><v>0</v></c>
+      <c r="F1" t="str"><f>""</f><v></v></c>
+      </row></sheetData></worksheet>`),
+    ).sheets[0];
+    for (const ref of ['A1', 'B1', 'C1']) expect(sheet.cells.get(ref)?.value).toBeUndefined();
+    expect(sheet.cells.get('B1')?.type).not.toBe('e');
+    expect(sheet.cells.get('D1')?.value).toBe(true);
+    expect(sheet.cells.get('E1')?.value).toBe(false);
+    expect(sheet.cells.get('F1')?.value).toBe('');
+    for (const cell of [
+      '<c r="A1" t="b"><v>2</v></c>',
+      '<c r="A1" t="b"><v></v></c>',
+      '<c r="A1" t="e"><v></v></c>',
+    ])
+      expect(() =>
+        readWorkbook(fixture(`<worksheet><sheetData><row r="1">${cell}</row></sheetData></worksheet>`)),
+      ).toThrow(WorkbookError);
+  });
   it('accepts legal single-quoted XML attributes and normalized cell addresses', () => {
     const xml =
       "<worksheet><sheetData><row r='1'><c r='a1' t='inlineStr'><is><t>&lt;safe&gt;</t></is></c></row></sheetData></worksheet>";
@@ -68,6 +93,7 @@ describe('workbook parsing regressions', () => {
     for (const body of [
       '<c r="A1" t="inlineStr"><is><t>&#99999999;</t></is></c>',
       '<c r="A1"><v>NaN</v></c>',
+      '<c r="A1"><v>  </v></c>',
       '<c r="A1" t="s"><v>99</v></c>',
     ])
       expect(() =>

@@ -171,9 +171,46 @@ function rowColumns(sheet: Sheet): Map<number, number[]> {
   return rows;
 }
 
-function rowSignatures(sheet: Sheet, columns: Map<number, number[]>): string[] {
+function textAnchors(sheet: Sheet): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const [ref, cell] of sheet.cells) {
+    if (
+      cell.formula !== undefined ||
+      cell.type !== 's' ||
+      typeof cell.value !== 'string' ||
+      !cell.value.trim()
+    )
+      continue;
+    const key = JSON.stringify([parseAddress(ref).col, cell.value]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function rowSignatures(
+  sheet: Sheet,
+  columns: Map<number, number[]>,
+  ownAnchors: Map<string, number>,
+  otherAnchors: Map<string, number>,
+): string[] {
   const signatures = Array<string>(sheet.rows).fill('');
-  for (const [row, cols] of columns)
+  for (const [row, cols] of columns) {
+    const anchor = cols.find((col) => {
+      const cell = sheet.cells.get(address(col, row))!;
+      if (
+        cell.formula !== undefined ||
+        cell.type !== 's' ||
+        typeof cell.value !== 'string' ||
+        !cell.value.trim()
+      )
+        return false;
+      const key = JSON.stringify([col, cell.value]);
+      return ownAnchors.get(key) === 1 && otherAnchors.get(key) === 1;
+    });
+    if (anchor !== undefined) {
+      signatures[row] = JSON.stringify(['label', anchor, sheet.cells.get(address(anchor, row))!.value]);
+      continue;
+    }
     signatures[row] = JSON.stringify(
       cols.map((col) => {
         const cell = sheet.cells.get(address(col, row))!;
@@ -182,6 +219,7 @@ function rowSignatures(sheet: Sheet, columns: Map<number, number[]>): string[] {
           : [col, cell.type, cell.value];
       }),
     );
+  }
   return signatures;
 }
 
@@ -332,21 +370,28 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
   // Row alignment for every matched sheet, so cross-sheet references can be remapped too.
   const ops = new Map<string, RowOp[]>();
   const mappers = new Map<string, (row: number) => number>();
-  const deletedFrom = new Map<string, number>();
+  const deletedRows = new Map<string, Set<number>>();
+  const survivingRows = new Map<string, number[]>();
+  const insertedRows = new Map<string, Set<number>>();
   const columns = new Map<Sheet, Map<number, number[]>>();
   for (const sheet of [...original.sheets, ...edited.sheets]) columns.set(sheet, rowColumns(sheet));
   for (const sheet of original.sheets) {
     const other = editedByName.get(sheet.name);
     if (!other) continue;
-    const sa = rowSignatures(sheet, columns.get(sheet)!);
-    const sb = rowSignatures(other, columns.get(other)!);
+    const anchorsA = textAnchors(sheet);
+    const anchorsB = textAnchors(other);
+    const sa = rowSignatures(sheet, columns.get(sheet)!, anchorsA, anchorsB);
+    const sb = rowSignatures(other, columns.get(other)!, anchorsB, anchorsA);
     const o = alignRows(sa, sb);
     ops.set(sheet.name, o);
-    const firstDeleted = o.find((op) => op.type === 'deleted');
-    if (firstDeleted?.type === 'deleted') deletedFrom.set(sheet.name.toLowerCase(), firstDeleted.a);
-    // A deleted cell becomes #REF!, while range endpoints shrink differently. Do not
-    // silently equate either with the next surviving cell: flag affected references.
-    else mappers.set(sheet.name.toLowerCase(), rowMapper(o, sheet.rows));
+    const key = sheet.name.toLowerCase();
+    deletedRows.set(key, new Set(o.flatMap((op) => (op.type === 'deleted' ? [op.a] : []))));
+    survivingRows.set(
+      key,
+      o.flatMap((op) => (op.type === 'same' || op.type === 'modified' ? [op.a] : [])),
+    );
+    insertedRows.set(key, new Set(o.flatMap((op) => (op.type === 'inserted' ? [op.b] : []))));
+    mappers.set(key, rowMapper(o, sheet.rows));
   }
   const identity = (r: number) => r;
 
@@ -522,7 +567,10 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
         }
         if (x.formula !== undefined && y.formula === undefined) {
           formulasCompared++;
-          const own = sameNumber(x.value, y.value) || valueText(x.value) === valueText(y.value);
+          const own =
+            x.value !== undefined &&
+            y.value !== undefined &&
+            (sameNumber(x.value, y.value) || valueText(x.value) === valueText(y.value));
           mark(
             add({
               kind: own ? 'formula-hardcoded' : 'formula-to-value',
@@ -546,10 +594,72 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
         }
         if (x.formula !== undefined && y.formula !== undefined) {
           formulasCompared++;
-          const expected = mapRefs(x.formula, (r) => ({
-            ...r,
-            row: r.row >= 0 ? remap(r.row, r.sheet) : r.row,
-          }));
+          const simpleAggregate =
+            /^(SUM|AVERAGE|COUNT|MIN|MAX)\(\$?[A-Z]{1,3}\$?\d+:\$?[A-Z]{1,3}\$?\d+\)$/.test(
+              normalize(x.formula),
+            );
+          let ambiguousDeletion = false;
+          const expected = mapRefs(x.formula, (r, token, endpoint) => {
+            if (r.row < 0) return r;
+            const key = (r.sheet ?? sheet.name).toLowerCase();
+            const deleted = deletedRows.get(key);
+            const surviving = survivingRows.get(key);
+            let sourceRow = r.row;
+            if (deleted?.has(sourceRow)) {
+              if (!token.b || token.a.row < 0 || token.b.row < 0) {
+                ambiguousDeletion = true;
+                return r;
+              }
+              const low = Math.min(token.a.row, token.b.row);
+              const high = Math.max(token.a.row, token.b.row);
+              const rows = surviving ?? [];
+              let left = 0;
+              let right = rows.length;
+              while (left < right) {
+                const mid = (left + right) >>> 1;
+                if (rows[mid] < sourceRow) left = mid + 1;
+                else right = mid;
+              }
+              sourceRow = (sourceRow === low ? rows[left] : rows[left - 1]) ?? -1;
+              if (sourceRow < low || sourceRow > high) {
+                ambiguousDeletion = true;
+                return r;
+              }
+            }
+            let mapped = remap(sourceRow, r.sheet);
+            // For a simple subtotal immediately below a one-column range, newly
+            // inserted numeric rows adjoining either edge are part of that range.
+            if (
+              simpleAggregate &&
+              token.b &&
+              !token.sheet &&
+              token.a.col === token.b.col &&
+              token.a.row >= 0 &&
+              token.b.row === op.a - 1 &&
+              token.a.row <= token.b.row
+            ) {
+              const inserted = insertedRows.get(key);
+              const direction = endpoint === 'a' ? -1 : 1;
+              let adjacent = mapped + direction;
+              while (inserted?.has(adjacent) && adjacent >= 0 && adjacent < op.b) {
+                const cell = sheet.cells.get(address(r.col, adjacent));
+                if (!cell || (typeof cell.value !== 'number' && cell.formula === undefined)) break;
+                mapped = adjacent;
+                adjacent += direction;
+              }
+            }
+            return { ...r, row: mapped };
+          });
+          if (ambiguousDeletion) {
+            mark(
+              add({
+                kind: 'references-changed',
+                ...base,
+                detail: 'A referenced row was deleted. Review this reference against the original.',
+              }),
+            );
+            continue;
+          }
           const diff = formulaDifference(expected, y.formula);
           if (diff) {
             mark(
@@ -559,22 +669,6 @@ export function compareWorkbooks(original: Workbook, edited: Workbook): Comparis
                 expected: expected !== x.formula ? expected : undefined,
                 detail: `=${expected} → =${y.formula}`,
                 notes: diff.notes,
-              }),
-            );
-            continue;
-          }
-          if (
-            ranges(x.formula).some((r) => {
-              const firstDeleted = deletedFrom.get((r.sheet ?? sheet.name).toLowerCase());
-              return firstDeleted !== undefined && (r.r1 < 0 || r.r1 >= firstDeleted);
-            })
-          ) {
-            mark(
-              add({
-                kind: 'references-changed',
-                ...base,
-                detail:
-                  'Rows were deleted from a referenced sheet. Review this reference against the original; deletion remapping is intentionally conservative.',
               }),
             );
             continue;

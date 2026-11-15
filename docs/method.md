@@ -22,7 +22,7 @@ An `.xlsx` or `.xlsm` file is a ZIP archive of XML parts (SpreadsheetML). Sheet 
 
 Comparing `A1` with `A1`, `A2` with `A2` and so on fails as soon as a row is inserted: everything below it would look changed. So rows are aligned first.
 
-Each row gets a **signature**: its values and its formulas written in **R1C1 form**, which is independent of position (`=B4*2` in row 4 and `=B5*2` in row 5 are both `=R[0]C[-1]*2`). A row that moved but did not change keeps its signature.
+Each row with a text value unique in the same column of both versions uses that value as an alignment anchor. Other rows use a **signature** of their typed values and formulas in **R1C1 form**, which is independent of position (`=B4*2` in row 4 and `=B5*2` in row 5 are both `=R[0]C[-1]*2`). Paired rows are still compared cell by cell: an unchanged label does not hide a changed value or formula.
 
 A bounded **Myers diff** pairs identical signatures between the two versions. Rows left unpaired in the same gap on both sides are paired in order as *modified*; the rest are *inserted* or *deleted*. After 1,500 edit steps the search falls back to equal signatures at the same positions. Repeated labels and extensive edits can produce ambiguous alignment: inspect the before/after addresses.
 
@@ -37,7 +37,9 @@ For supported A1 formulas, Sheet Sentry computes an **expected formula** using t
 - `=Costs!B6` that is now `=Costs!B7` because a row was inserted above it: expected, **not reported**.
 - `=SUM(B2:B5)` that should have become `=SUM(B2:B6)` but is still `=SUM(B2:B5)`: **range no longer covers all rows**.
 
-**Deleted rows are conservative.** A reference to a deleted cell should not silently become a reference to the next surviving cell, while ranges have different endpoint rules. Sheets containing inferred deletions therefore do not receive insertion remapping. Unchanged formulas whose references reach a deleted row or later receive a high-severity reference-review finding. Legitimate deletion adjustments can produce extra findings.
+**Deleted rows.** Supported ranges are remapped to their surviving endpoints. A direct reference to an inferred deleted row, or a range with no surviving row, is flagged for review rather than silently equated to another cell. Row alignment is inferred from saved values and can be ambiguous.
+
+**Rows adjacent to a subtotal.** For a simple single-column `SUM`, `AVERAGE`, `COUNT`, `MIN` or `MAX` immediately below its range, adjacent newly inserted numeric or formula cells are included in the expected range. This is an inference, not proof that the author intended to include the new item; inspect the finding and surrounding rows. Other formula structures are compared using the inferred surviving-cell mapping without this adjacency rule.
 
 Formula comparison preserves string contents, spaces in quoted sheet names and possible whitespace intersection operators. It is not a complete Excel grammar or semantic equivalence engine. Structured, external, 3D, dynamic-array and data-table formulas need manual verification.
 

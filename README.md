@@ -19,7 +19,7 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-9be564?style=flat-square">
   <img alt="Workbooks never uploaded" src="https://img.shields.io/badge/workbooks-never_uploaded-5fcf8a?style=flat-square">
   <img alt="One runtime dependency" src="https://img.shields.io/badge/runtime_deps-1_(fflate)-7cc4ff?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-64_unit_and_CLI_·_11_browser-ffd166?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-78_unit_and_CLI_·_13_browser-ffd166?style=flat-square">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square">
 </p>
 
@@ -285,7 +285,7 @@ npm run format:check   # Prettier
 npm run screenshots    # regenerate README screenshots from the demo
 ```
 
-The engine is plain TypeScript with one dependency (fflate, for unzipping). The suite includes 64 unit/CLI tests and 11 browser scenarios covering the synthetic demo, malformed inputs, sparse sheets, formula handling, report escaping, input overwrite protection, upload races, downloads and responsive layout. Fixtures include hand-written SpreadsheetML as well as the minimal demo writer; they are not an Excel conformance certification. See [CONTRIBUTING.md](CONTRIBUTING.md).
+The engine is plain TypeScript with one dependency (fflate, for unzipping). The suite includes 78 unit/CLI tests and 13 browser scenarios covering the synthetic demo, malformed inputs, sparse sheets, formula handling, report escaping, input overwrite protection, upload races, downloads and responsive layout. Fixtures include real openpyxl re-saves and structural edit cases, hand-written SpreadsheetML, and the minimal demo writer; they are not an Excel conformance certification. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 To restore on a replacement computer, clone the repository, install Node.js 24, run `npm ci`, then `npm run check`. Install the Chromium test browser with `npx playwright install chromium` before running the browser suite. Build output and dependencies are regenerated; no secret environment variables are required for local use.
 

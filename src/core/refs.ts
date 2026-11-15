@@ -178,12 +178,15 @@ function sheetText(sheet?: string): string {
 }
 
 /** Rewrite every reference through `map`. */
-export function mapRefs(formula: string, map: (ref: CellRef) => CellRef): string {
+export function mapRefs(
+  formula: string,
+  map: (ref: CellRef, token: RefToken, endpoint: 'a' | 'b') => CellRef,
+): string {
   const tokens = findRefs(formula);
   let out = '';
   let pos = 0;
-  const mappedText = (ref: CellRef) => {
-    const mapped = map(ref);
+  const mappedText = (ref: CellRef, token: RefToken, endpoint: 'a' | 'b') => {
+    const mapped = map(ref, token, endpoint);
     if (
       (ref.row >= 0 && (mapped.row < 0 || mapped.row >= 1_048_576)) ||
       (ref.col >= 0 && (mapped.col < 0 || mapped.col >= 16_384))
@@ -193,8 +196,8 @@ export function mapRefs(formula: string, map: (ref: CellRef) => CellRef): string
   };
   for (const t of tokens) {
     out += formula.slice(pos, t.start);
-    out += sheetText(t.sheet) + mappedText(t.a);
-    if (t.b) out += ':' + mappedText(t.b);
+    out += sheetText(t.sheet) + mappedText(t.a, t, 'a');
+    if (t.b) out += ':' + mappedText(t.b, t, 'b');
     pos = t.end;
   }
   return out + formula.slice(pos);

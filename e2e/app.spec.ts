@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { writeWorkbook } from '../src/core/xlsx.ts';
 
 async function loadDemo(page: Page) {
   await page.goto('/');
@@ -98,6 +99,68 @@ test('identical workbooks are clean', async ({ page }) => {
   await page.locator('#file-edited').setInputFiles(file);
   await expect(page.locator('.verdict-bar h1')).toHaveText('No meaningful changes');
   await expect(page.locator('.findings')).toContainText('No changes in this view.');
+});
+
+test('an openpyxl resave without formula caches compares cleanly', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#file-original').setInputFiles('examples/q3-budget.xlsx');
+  await page.locator('#file-edited').setInputFiles('tests/fixtures/q3-budget-openpyxl.xlsx');
+  await expect(page.locator('.verdict-bar h1')).toHaveText('No meaningful changes');
+  await expect(page.locator('#intro-error')).toBeHidden();
+});
+
+test('inserted last budget row is included in the total', async ({ page }) => {
+  const make = (withNewRow: boolean, formula: string) => {
+    const cells: Parameters<typeof writeWorkbook>[0][number]['cells'] = {
+      A1: 'Item',
+      B1: 'Amount',
+      A2: 'Rent',
+      B2: 100,
+      A3: 'Cloud',
+      B3: 60,
+    };
+    if (withNewRow) {
+      cells.A4 = 'Insurance';
+      cells.B4 = 20;
+    }
+    const total = withNewRow ? 5 : 4;
+    cells[`A${total}`] = 'Total';
+    cells[`B${total}`] = { f: formula, v: withNewRow ? 180 : 160 };
+    return Buffer.from(writeWorkbook([{ name: 'Budget', cells }]));
+  };
+  await page.goto('/');
+  await page
+    .locator('#file-original')
+    .setInputFiles({
+      name: 'before.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: make(false, 'SUM(B2:B3)'),
+    });
+  await page
+    .locator('#file-edited')
+    .setInputFiles({
+      name: 'after.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: make(true, 'SUM(B2:B4)'),
+    });
+  await expect(page.locator('.verdict-bar h1')).toHaveText('No meaningful changes');
+  await page.getByRole('button', { name: 'New comparison' }).click();
+  await page
+    .locator('#file-original')
+    .setInputFiles({
+      name: 'before.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: make(false, 'SUM(B2:B3)'),
+    });
+  await page
+    .locator('#file-edited')
+    .setInputFiles({
+      name: 'after.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: make(true, 'SUM(B2:B3)'),
+    });
+  await expect(page.locator('.verdict-bar h1')).toHaveText('Risky edit');
+  await expect(page.locator('.inspector h2')).toHaveText('Range no longer covers all rows');
 });
 
 test('a failed replacement clears its slot rather than comparing stale input', async ({ page }) => {

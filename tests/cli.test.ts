@@ -62,4 +62,61 @@ describe('CLI file and option contracts', () => {
     expect(run(original, changed).status).toBe(0);
     expect(run(original, changed, '--fail-on', 'medium').status).toBe(1);
   });
+  it('accepts an openpyxl resave with empty formula caches', () => {
+    const report = path.join(directory, 'openpyxl-review.json');
+    const result = run('examples/q3-budget.xlsx', 'tests/fixtures/q3-budget-openpyxl.xlsx', '--json', report);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(readFileSync(report, 'utf8')).verdict).toBe('clean');
+  });
+  it('reports an omitted inserted subtotal row without calling the formula a constant', () => {
+    const before = path.join(directory, 'subtotal-before.xlsx');
+    const after = path.join(directory, 'subtotal-after.xlsx');
+    const report = path.join(directory, 'subtotal-report.json');
+    writeFileSync(
+      before,
+      writeWorkbook([
+        {
+          name: 'Budget',
+          cells: {
+            A1: 'Item',
+            B1: 'Amount',
+            A2: 'Rent',
+            B2: 100,
+            A3: 'Cloud',
+            B3: 60,
+            A4: 'Total',
+            B4: { f: 'SUM(B2:B3)', v: 160 },
+          },
+        },
+      ]),
+    );
+    writeFileSync(
+      after,
+      writeWorkbook([
+        {
+          name: 'Budget',
+          cells: {
+            A1: 'Item',
+            B1: 'Amount',
+            A2: 'Rent',
+            B2: 100,
+            A3: 'Cloud',
+            B3: 60,
+            A4: 'Insurance',
+            B4: 20,
+            A5: 'Total',
+            B5: { f: 'SUM(B2:B3)', v: 160 },
+          },
+        },
+      ]),
+    );
+    expect(run(before, after, '--json', report, '--fail-on', 'critical').status).toBe(1);
+    const result = JSON.parse(readFileSync(report, 'utf8'));
+    expect(
+      result.changes.some(
+        (change: { kind: string; cell: string }) => change.kind === 'range-shrunk' && change.cell === 'B5',
+      ),
+    ).toBe(true);
+    expect(result.changes.some((change: { kind: string }) => change.kind === 'formula-to-value')).toBe(false);
+  });
 });

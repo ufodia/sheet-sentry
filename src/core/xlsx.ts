@@ -257,9 +257,13 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
         const inline = /<is>([\s\S]*?)<\/is>/.exec(body)?.[1];
         let value: Cell['value'];
         let type: Cell['type'] = 'n';
-        if (ca.t === 's' && raw !== undefined) {
+        // A numeric, boolean, error or shared-string formula may have an empty
+        // <v> when its result has not been cached. A cached empty string is real.
+        if (formula !== undefined && raw !== undefined && !raw.trim() && ca.t !== 'str' && ca.t !== 'd') {
+          type = ca.t === 'b' ? 'b' : ca.t === 's' ? 's' : 'n';
+        } else if (ca.t === 's' && raw !== undefined) {
           const index = Number(raw);
-          if (!Number.isInteger(index) || index < 0 || index >= shared.length)
+          if (!raw.trim() || !Number.isInteger(index) || index < 0 || index >= shared.length)
             throw new WorkbookError(`Invalid shared-string index at ${a.name}!${ref}.`);
           value = shared[index];
           type = 's';
@@ -272,9 +276,12 @@ export function readWorkbook(bytes: Uint8Array): Workbook {
           value = decodeXml(raw);
           type = 's';
         } else if (ca.t === 'b' && raw !== undefined) {
-          value = raw === '1';
+          if (raw.trim() !== '0' && raw.trim() !== '1')
+            throw new WorkbookError(`Invalid boolean value at ${a.name}!${ref}.`);
+          value = raw.trim() === '1';
           type = 'b';
         } else if (ca.t === 'e' && raw !== undefined) {
+          if (!raw.trim()) throw new WorkbookError(`Invalid error value at ${a.name}!${ref}.`);
           value = decodeXml(raw);
           type = 'e';
         } else if (raw !== undefined) {
