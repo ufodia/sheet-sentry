@@ -2,6 +2,24 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { writeWorkbook } from '../src/core/xlsx.ts';
 
+test('sheet tabs support arrow navigation and preserve focus after filter changes', async ({ page }) => {
+  await loadDemo(page);
+  await expect(page.locator('#workspace h1')).toBeFocused();
+  const tabs = page.getByRole('tablist', { name: 'Sheets' });
+  await tabs.getByRole('tab', { selected: true }).press('End');
+  await expect(tabs.getByRole('tab').last()).toBeFocused();
+  await expect(tabs.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
+  await tabs.getByRole('tab').last().press('Home');
+  await expect(tabs.getByRole('tab').first()).toBeFocused();
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'sheet-tab-0');
+  await page.locator('#filter-high').press('Enter');
+  await expect(page.locator('#filter-high')).toBeFocused();
+  await page.locator('#show-info').press('Space');
+  await expect(page.locator('#show-info')).toBeFocused();
+  await page.getByRole('button', { name: 'New comparison', exact: true }).press('Enter');
+  await expect(page.locator('#demo-button')).toBeFocused();
+});
+
 async function loadDemo(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Review the demo budget' }).click();

@@ -285,7 +285,7 @@ npm run format:check   # Prettier
 npm run screenshots    # regenerate README screenshots from the demo
 ```
 
-The engine is plain TypeScript with one dependency (fflate, for unzipping). The suite includes 78 unit/CLI tests and 13 browser scenarios covering the synthetic demo, malformed inputs, sparse sheets, formula handling, report escaping, input overwrite protection, upload races, downloads and responsive layout. Fixtures include real openpyxl re-saves and structural edit cases, hand-written SpreadsheetML, and the minimal demo writer; they are not an Excel conformance certification. See [CONTRIBUTING.md](CONTRIBUTING.md).
+The engine is plain TypeScript with one dependency (fflate, for unzipping). The suite includes 78 unit/CLI tests and 14 browser scenarios covering the synthetic demo, malformed inputs, sparse sheets, formula handling, report escaping, input overwrite protection, upload races, downloads and responsive layout. Fixtures include real openpyxl re-saves and structural edit cases, hand-written SpreadsheetML, and the minimal demo writer; they are not an Excel conformance certification. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 To restore on a replacement computer, clone the repository, install Node.js 24, run `npm ci`, then `npm run check`. Install the Chromium test browser with `npx playwright install chromium` before running the browser suite. Build output and dependencies are regenerated; no secret environment variables are required for local use.
 

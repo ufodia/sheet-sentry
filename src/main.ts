@@ -126,6 +126,9 @@ function run() {
   intro.hidden = true;
   workspace.hidden = false;
   render();
+  const heading = workspace.querySelector<HTMLElement>('h1');
+  heading?.setAttribute('tabindex', '-1');
+  heading?.focus();
   window.scrollTo({ top: 0 });
 }
 
@@ -203,6 +206,7 @@ function formatValue(cell?: Cell | { value?: Cell['value']; format?: string }): 
 
 function render() {
   if (!result || !original || !edited) return;
+  const focusedId = workspace.contains(document.activeElement) ? document.activeElement?.id : '';
   const r = result;
   const verdict = VERDICT[r.verdict];
   const head = h(
@@ -223,6 +227,7 @@ function render() {
           'button',
           {
             type: 'button',
+            id: `filter-${s}`,
             class: `count sev-${s}`,
             'aria-pressed': String(filter === s),
             onclick: () => {
@@ -255,12 +260,26 @@ function render() {
           type: 'button',
           role: 'tab',
           class: `sheet-tab ${worst ? `has-${worst}` : ''}`,
+          id: `sheet-tab-${i}`,
+          'aria-controls': 'sheet-panel',
           'aria-selected': String(i === sheetIndex),
-          onclick: () => {
-            sheetIndex = i;
-            top = 0;
-            selected = null;
-            render();
+          tabindex: i === sheetIndex ? 0 : -1,
+          onclick: () => chooseSheet(i),
+          onkeydown: (event: Event) => {
+            const key = (event as KeyboardEvent).key;
+            const next =
+              key === 'Home'
+                ? 0
+                : key === 'End'
+                  ? r.sheets.length - 1
+                  : key === 'ArrowRight'
+                    ? (i + 1) % r.sheets.length
+                    : key === 'ArrowLeft'
+                      ? (i + r.sheets.length - 1) % r.sheets.length
+                      : -1;
+            if (next < 0) return;
+            event.preventDefault();
+            chooseSheet(next);
           },
         },
         s.name,
@@ -278,11 +297,30 @@ function render() {
     h(
       'div',
       { class: 'ws-grid' },
-      h('div', { class: 'viewer' }, tabs, grid(r.sheets[sheetIndex]), inspector()),
+      h(
+        'div',
+        { class: 'viewer' },
+        tabs,
+        h(
+          'div',
+          { id: 'sheet-panel', role: 'tabpanel', tabindex: 0, 'aria-labelledby': `sheet-tab-${sheetIndex}` },
+          grid(r.sheets[sheetIndex]),
+          inspector(),
+        ),
+      ),
       h('aside', { class: 'panel' }, findingsPanel(r), exportsPanel(r)),
     ),
   );
+  if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
   document.querySelector('.cell.selected')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function chooseSheet(index: number) {
+  sheetIndex = index;
+  top = 0;
+  selected = null;
+  render();
+  byId(`sheet-tab-${index}`).focus();
 }
 
 function grid(sheetResult: SheetResult): HTMLElement {
@@ -455,6 +493,7 @@ function findingsPanel(r: Comparison): HTMLElement {
         'button',
         {
           type: 'button',
+          id: `change-${c.id}`,
           class: `change sev-${c.severity} ${selected?.id === c.id ? 'active' : ''}`,
           onclick: () => {
             selected = c;
@@ -475,7 +514,7 @@ function findingsPanel(r: Comparison): HTMLElement {
       ),
     ),
   );
-  const toggle = h('input', { type: 'checkbox', checked: showInfo });
+  const toggle = h('input', { id: 'show-info', type: 'checkbox', checked: showInfo });
   toggle.addEventListener('change', () => {
     showInfo = toggle.checked;
     render();
@@ -562,4 +601,5 @@ function reset() {
   workspace.hidden = true;
   workspace.replaceChildren();
   intro.hidden = false;
+  byId('demo-button').focus();
 }
