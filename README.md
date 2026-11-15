@@ -307,6 +307,7 @@ Sheet Sentry is free and has no ads. If it caught a hardcoded total before it re
 
 <p align="center">
   <a href="https://buymeacoffee.com/ufodia"><img src="docs/assets/support.svg" alt="Buy Me a Coffee — support ufodia" height="60"></a>
+  <a href="https://github.com/sponsors/ufodia">Support on GitHub Sponsors</a>
 </p>
 
 ## License
